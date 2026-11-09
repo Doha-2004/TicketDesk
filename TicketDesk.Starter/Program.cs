@@ -24,21 +24,27 @@ public static class Program
 
     private static int RunDemo()
     {
-        var service = new TicketBookingService();
+        var service = new TicketBookingService(new FileBookingStore(), new ConsoleConfirmationSender());
         var standard = service.Book(new TicketRequest
         {
-            Reference = "T-001", CustomerName = "Amina", Email = "amina@example.test",
-            Quantity = 2, UnitPrice = 100m
+            Reference = "T-001",
+            CustomerName = "Amina",
+            Email = "amina@example.test",
+            Quantity = 2,
+            UnitPrice = 100m
         }, "standard");
 
         var member = service.Book(new TicketRequest
         {
-            Reference = "T-002", CustomerName = "Omar", Email = "omar@example.test",
-            Quantity = 2, UnitPrice = 100m
+            Reference = "T-002",
+            CustomerName = "Omar",
+            Email = "omar@example.test",
+            Quantity = 2,
+            UnitPrice = 100m
         }, "member");
 
-        Console.WriteLine($"Standard total: {standard.ToString("0.00", CultureInfo.InvariantCulture)} EGP");
-        Console.WriteLine($"Member total: {member.ToString("0.00", CultureInfo.InvariantCulture)} EGP");
+        Console.WriteLine($"Standard total: {standard.Total.ToString("0.00", CultureInfo.InvariantCulture)} EGP");
+        Console.WriteLine($"Member total: {member.Total.ToString("0.00", CultureInfo.InvariantCulture)} EGP");
         Console.WriteLine("Run --contract-check to examine the common booking-fee contract.");
         return 0;
     }

@@ -1,24 +1,24 @@
 namespace TicketDesk.Starter;
 
+// Coordinator only: validate -> fee -> receipt -> save -> notify.
 public sealed class TicketBookingService
 {
-    public decimal Book(TicketRequest request, string feeMode)
-    {
-        ArgumentNullException.ThrowIfNull(request);
+    private readonly IBookingStore _store;
+    private readonly IConfirmationSender _sender;
 
-        if (string.IsNullOrWhiteSpace(request.Reference))
-            throw new ArgumentException("A booking reference is required.");
-        if (string.IsNullOrWhiteSpace(request.CustomerName))
-            throw new ArgumentException("A customer name is required.");
-        if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
-            throw new ArgumentException("An email containing @ is required.");
-        if (request.Quantity <= 0)
-            throw new ArgumentOutOfRangeException(nameof(request.Quantity), "Quantity must be positive.");
-        if (request.UnitPrice <= 0)
-            throw new ArgumentOutOfRangeException(nameof(request.UnitPrice), "Unit price must be positive.");
+    public TicketBookingService(IBookingStore store, IConfirmationSender sender)
+    {
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+    }
+
+    public BookingReceipt Book(TicketRequest request, string feeMode)
+    {
+        BookingRequestValidator.Validate(request);
 
         var baseAmount = request.Quantity * request.UnitPrice;
 
+        // Temporary: this switch is removed in Phase 5 (fee registry).
         IBookingFee feeCalculator = feeMode?.Trim().ToLowerInvariant() switch
         {
             "standard" => new StandardBookingFee(),
@@ -27,16 +27,18 @@ public sealed class TicketBookingService
         };
 
         var fee = feeCalculator.Calculate(baseAmount);
-        var total = baseAmount + fee;
-        var receipt = FormattableString.Invariant(
-            $"Reference={request.Reference.Trim()} | Customer={request.CustomerName.Trim()} | Tickets={request.Quantity} | Base={baseAmount:0.00} | Fee={fee:0.00} | Total={total:0.00} | Currency=EGP");
+        var receipt = new BookingReceipt(
+            request.Reference.Trim(),
+            request.CustomerName.Trim(),
+            request.Quantity,
+            baseAmount,
+            fee,
+            baseAmount + fee,
+            "EGP");
 
-        var store = new FileBookingStore();
-        store.Save(receipt);
+        _store.Save(receipt);
+        _sender.Send(request.Email.Trim(), receipt);
 
-        IMessageGateway gateway = new EmailGateway();
-        gateway.SendEmail(request.Email.Trim(), receipt);
-
-        return total;
+        return receipt;
     }
 }

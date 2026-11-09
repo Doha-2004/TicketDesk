@@ -1,34 +1,26 @@
 namespace TicketDesk.Starter;
 
-public interface IMessageGateway
+// Adapters: the only place that touches the console / the file system.
+// They also own the text format of a receipt.
+
+internal static class ReceiptText
 {
-    void SendEmail(string recipient, string body);
-    void SendSms(string phoneNumber, string body);
-    void Print(string body);
+    public static string Format(BookingReceipt receipt) => FormattableString.Invariant(
+        $"Reference={receipt.Reference} | Customer={receipt.Customer} | Tickets={receipt.Quantity} | Base={receipt.BaseAmount:0.00} | Fee={receipt.Fee:0.00} | Total={receipt.Total:0.00} | Currency={receipt.Currency}");
 }
 
-public sealed class EmailGateway : IMessageGateway
+public sealed class ConsoleConfirmationSender : IConfirmationSender
 {
-    public void SendEmail(string recipient, string body)
+    public void Send(string recipientEmail, BookingReceipt receipt)
     {
-        Console.WriteLine($"[Simulated email] To: {recipient}; {body}");
-    }
-
-    public void SendSms(string phoneNumber, string body)
-    {
-        throw new NotSupportedException("This gateway only supports email.");
-    }
-
-    public void Print(string body)
-    {
-        throw new NotSupportedException("This gateway cannot print.");
+        Console.WriteLine($"[Simulated email] To: {recipientEmail}; {ReceiptText.Format(receipt)}");
     }
 }
 
-public sealed class FileBookingStore
+public sealed class FileBookingStore : IBookingStore
 {
-    public void Save(string receipt)
+    public void Save(BookingReceipt receipt)
     {
-        File.AppendAllText("ticket-bookings.log", receipt + Environment.NewLine);
+        File.AppendAllText("ticket-bookings.log", ReceiptText.Format(receipt) + Environment.NewLine);
     }
 }
