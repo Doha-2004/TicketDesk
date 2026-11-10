@@ -22,9 +22,19 @@ public static class Program
         }
     }
 
+    // Explicit composition: the only place that knows the concrete collaborators and fee rules.
+    private static TicketBookingService CreateService() => new(
+        new FileBookingStore(),
+        new ConsoleConfirmationSender(),
+        new Dictionary<string, IBookingFee>
+        {
+            ["standard"] = new StandardBookingFee(),
+            ["member"] = new MemberBookingFee(),
+        });
+
     private static int RunDemo()
     {
-        var service = new TicketBookingService(new FileBookingStore(), new ConsoleConfirmationSender());
+        var service = CreateService();
         var standard = service.Book(new TicketRequest
         {
             Reference = "T-001",
