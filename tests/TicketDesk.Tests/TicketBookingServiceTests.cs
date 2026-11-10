@@ -11,6 +11,7 @@ public class TicketBookingServiceTests
     {
         ["standard"] = new StandardBookingFee(),
         ["member"] = new MemberBookingFee(),
+        ["priority"] = new PriorityBookingFee(),
     };
 
     private static TicketRequest Request(
@@ -32,6 +33,7 @@ public class TicketBookingServiceTests
     [Theory]
     [InlineData("standard", 2, 100, 200, 20, 220)]
     [InlineData("member", 2, 100, 200, 0, 200)]
+    [InlineData("priority", 2, 100, 200, 50, 250)]
     [InlineData("member", 1, 50, 50, 0, 50)]
     [InlineData("member", 1, 100, 100, 0, 100)]
     [InlineData("  Member  ", 2, 100, 200, 0, 200)]

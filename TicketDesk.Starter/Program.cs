@@ -30,6 +30,7 @@ public static class Program
         {
             ["standard"] = new StandardBookingFee(),
             ["member"] = new MemberBookingFee(),
+            ["priority"] = new PriorityBookingFee(),
         });
 
     private static int RunDemo()
@@ -61,7 +62,7 @@ public static class Program
 
     private static int RunContractChecks()
     {
-        IBookingFee[] calculators = [new StandardBookingFee(), new MemberBookingFee()];
+        IBookingFee[] calculators = [new StandardBookingFee(), new MemberBookingFee(), new PriorityBookingFee()];
         decimal[] amounts = [1m, 50m, 100m, 200m];
         var failures = 0;
 

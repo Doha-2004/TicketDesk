@@ -12,6 +12,7 @@ public class BookingFeeContractTests
     {
         ["Standard"] = (new StandardBookingFee(), 20m),
         ["Member"] = (new MemberBookingFee(), 0m),
+        ["Priority"] = (new PriorityBookingFee(), 50m),
     };
 
     private static readonly decimal[] BaseAmounts = [1m, 50m, 100m, 200m];
