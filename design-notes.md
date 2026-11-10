@@ -112,3 +112,63 @@ interface does not allow. It stayed unnoticed because the workflow only exercise
 | L | One shared loop: Standard, Member, Priority × bases 1, 50, 100, 200 → 12 checks, all pass |
 | I | Doubles implement a single method; no `NotSupportedException` anywhere |
 | D | Service built with in-memory / throwing doubles; shared trace shows `save, notify`; failure cases as listed above |
+
+---
+
+## After the refactor
+
+This section was added in Phase 8. Everything above is the original Phase 1 text, unchanged.
+
+### What was done, per principle
+
+| Principle | Planned | Done |
+|---|---|---|
+| S | `BookingReceipt`, `BookingRequestValidator`, coordinator-only service, formatting in adapters | As planned (commit `a2695a6`). Text formatting lives in `Gateways.cs` (a small internal `ReceiptText` helper shared by both adapters). The validator is a plain static class, not an interface: nothing needs to substitute it. |
+| O | Injected registry keyed by normalized name; Priority in its own commit | Registry injected in `0160aa0`. The service copies the registry into a trim + case-insensitive dictionary, so callers need not care how it was built. Null, blank and unknown modes throw `ArgumentException` before any side effect. Priority added in `b3c03af`. |
+| L | Remove the minimum spend from `MemberBookingFee`, keep the `<= 0` rejection | Done in `c48bd39` (3 lines deleted). No catch, no special case, Member stays in every check. |
+| I | `IBookingStore` (Save) and `IConfirmationSender` (Send); delete `IMessageGateway` | As planned. `EmailGateway` became `ConsoleConfirmationSender`. SMS and print are not implemented. |
+| D | Constructor injection; explicit composition in `Program` | As planned. `Program.CreateService()` is the only place that names concrete collaborators and fee rules. |
+
+### Verification results
+
+| Principle | Planned proof | Actual result |
+|---|---|---|
+| S | Receipt fields asserted; each invalid field rejected with 0 saves and 0 notifications | 12 invalid-input cases plus 4 unknown-fee cases, all with an empty trace; full receipt asserted in the success test |
+| O | Priority-only commit without `TicketBookingService.cs` | `b3c03af` changed 4 files: `PriorityBookingFee.cs`, `Program.cs` and two test files. `TicketBookingService.cs`, the validator and the store/sender interfaces were not touched. |
+| L | One loop over Standard, Member, Priority x 1, 50, 100, 200 | Before the fix (`3ff3ad6`): 6 passed, 2 failed (Member 1 and 50). After (`c48bd39`): 8 of 8. With Priority (`b3c03af`): 12 of 12, also in `--contract-check`. |
+| I | Doubles implement one method; no `NotSupportedException` | Holds. |
+| D | Trace `save, notify`; failing store -> no notify; failing sender -> one saved record, one attempt, no retry | Covered by two dedicated tests plus the success test. The whole suite is 37 tests and uses no file system or console. |
+
+Deviation from the plan: the Priority commit also touched two test files and `Program.cs` (to add the contract
+rows and the `priority` registration), which the plan allowed; the workflow files were not touched.
+
+### Where is each abstraction useful, and what gets harder without it?
+
+- **`IBookingFee` + injected registry.** Priority was added with one new class and one registration line.
+  Without them every new fee rule means editing the booking workflow (the old `switch`), and there is no
+  shared contract to run the same checks against every rule.
+- **`IBookingStore`.** The save-failure case ("failure reaches the caller, nobody is notified") can be tested
+  with a throwing double. Without it the workflow would create a real file store, tests would write
+  `ticket-bookings.log`, and switching to a database would edit the workflow.
+- **`IConfirmationSender`.** Tests capture what would be sent and simulate a failing sender. Without it the
+  workflow prints to the console directly, notification failure cannot be reproduced, and a new channel
+  means editing the workflow.
+- **`BookingReceipt`.** Tests compare fields. Without it the receipt is a string and tests have to parse text.
+- **`BookingRequestValidator`.** Validation rules change independently of pricing and I/O, and can be tested
+  with no collaborators. It is deliberately not an interface: there is one implementation and nothing to
+  substitute, so an interface would add a file without adding value.
+
+### LSP and ISP are different problems
+
+- **LSP (`MemberBookingFee`) is about behavior.** `IBookingFee` documents that every positive base amount is
+  valid. `MemberBookingFee` added a precondition (a minimum of 100 EGP) and threw
+  `InvalidOperationException` for small amounts. A caller that works with `StandardBookingFee` for a 1 EGP or
+  50 EGP booking breaks when handed a `MemberBookingFee`, so the caller's view of the contract changed with
+  the implementation. The interface was fine; the fix is in the implementation, and tests hold every
+  implementation to the same contract.
+- **ISP (`IMessageGateway`) is about the size of the contract.** The interface demanded email, SMS and
+  printing although the only consumer needed to send one confirmation email, so implementers were forced to
+  write stubs that throw `NotSupportedException`. Nothing misbehaved when used correctly; the contract simply
+  asked for too much. The fix is in the interface: split it into the small contracts that consumers use.
+
+LSP breaks the expectations of callers; ISP breaks the design of the contract itself.
